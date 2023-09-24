@@ -19,7 +19,7 @@ module grantproject::proofOfFlex{
     const ENonExistentContainer: u64 = 0;
 
     struct ProofOfFlex has key{
-        uid: UID,
+        id: UID,
         url: Url,
         name: String,
         amount: u64,
@@ -27,12 +27,12 @@ module grantproject::proofOfFlex{
     }
 
     struct AdminCap has key{
-        uid: UID,
+        id: UID,
     }
 
     //keep track of the amount of money in the container (could simplifiy with only Suicoin) why an object ?
     struct Container has key, store{
-        uid: UID,
+        id: UID,
         userOwner: address,
         balance: Balance<SUI>
     }
@@ -68,7 +68,7 @@ module grantproject::proofOfFlex{
     }
 
     // create a container with the asset choosen, and put it into container Manager in a table
-    public entry fun depositFlexMoney(ctx: &mut TxContext, containerManager: &mut ContainerManager, coin: Coin<SUI>){
+    public entry fun depositFlexMoney( containerManager: &mut ContainerManager, coin: Coin<SUI>, ctx: &mut TxContext){
 
         let container = Container{
             uid: object::new(ctx),
