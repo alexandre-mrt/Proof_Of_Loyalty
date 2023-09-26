@@ -33,7 +33,7 @@ module grantproject::proofOfFlex_tests{
             let coin = coin::mint_for_testing<SUI>(1000, ctx);
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
 
-            proofOfFlex::depositFlexMoney( ctx, &mut containerManager, coin);
+            proofOfFlex::depositFlexMoney(  &mut containerManager, coin,ctx);
 
             assert!(proofOfFlex::getContainerAmount(&containerManager)== 1000, 1000);
             assert!(proofOfFlex::getContainerSize(&containerManager)== 1, 1);
@@ -45,8 +45,8 @@ module grantproject::proofOfFlex_tests{
         {
             let ctx = test_scenario::ctx(scenario);
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
-            proofOfFlex::mintFlexNFT( ctx, &mut containerManager);
-            assert!(proofOfFlex::getContainerWinner(containerManager) == 1000, 1001);
+            proofOfFlex::mintFlexNFT(  &mut containerManager, ctx);
+            assert!(proofOfFlex::getContainerWinner(&containerManager) == 1000, 1001);
             test_scenario::return_shared<ContainerManager>(containerManager);
 
         };
@@ -56,7 +56,7 @@ module grantproject::proofOfFlex_tests{
             let ctx = test_scenario::ctx(scenario);
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
 
-            proofOfFlex::redeemFlexMoney( ctx, &mut containerManager);
+            proofOfFlex::redeemFlexMoney(  &mut containerManager, ctx);
 
             assert!(proofOfFlex::getContainerAmount(&containerManager)== 0, 0);
             // take the user balance to check if he received well the money

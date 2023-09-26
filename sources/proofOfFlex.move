@@ -17,6 +17,7 @@ module grantproject::proofOfFlex{
 
 
     const ENonExistentContainer: u64 = 0;
+    const EContainerAlreadyExist: u64 = 1;
 
     struct ProofOfFlex has key{
         id: UID,
@@ -40,19 +41,21 @@ module grantproject::proofOfFlex{
     //Store all the containers in the record table (dynamical storage already) could add a table to keep track of the record for the best 3
     // winner should be tupple of (address, amount) to keep track of the winner
     struct ContainerManager has key{
-        uid: UID,
+        id: UID,
         amount: u64,
         record: ObjectTable<address, Container>,
-        winner: u64
+        winnerTime: u64,
+        winnerAmount: u64
     }
 
     fun init(ctx: &mut TxContext){
 
         transfer::share_object(ContainerManager{
-            uid: object::new(ctx),
+            id: object::new(ctx),
             amount: 0,
             record: object_table::new(ctx),
-            winner: 0
+            winnerAmount : 0,
+            winnerTime : 0
         });
     }
 
@@ -64,14 +67,18 @@ module grantproject::proofOfFlex{
         return containerManager.amount
     }
     public entry fun getContainerWinner(containerManager: &ContainerManager): u64{
-        return containerManager.winner
+        return containerManager.winnerAmount
     }
 
     // create a container with the asset choosen, and put it into container Manager in a table
     public entry fun depositFlexMoney( containerManager: &mut ContainerManager, coin: Coin<SUI>, ctx: &mut TxContext){
 
+        //beta does not allow user to have severals positions
+        assert!(!object_table::contains(&containerManager.record, tx_context::sender(ctx)),EContainerAlreadyExist);
+        
+
         let container = Container{
-            uid: object::new(ctx),
+            id: object::new(ctx),
             userOwner: tx_context::sender(ctx),
             balance: coin::into_balance(coin)
         };
@@ -84,13 +91,13 @@ module grantproject::proofOfFlex{
     
 
     //could I have just returned the coin and not send it ?
-    public entry fun redeemFlexMoney(ctx: &mut TxContext, containerManager: &mut ContainerManager){
+    public entry fun redeemFlexMoney( containerManager: &mut ContainerManager, ctx: &mut TxContext){
 
         assert!(object_table::contains(&containerManager.record, tx_context::sender(ctx)),ENonExistentContainer);
 
         //let container = object_table::borrow_mut( &mut containerManager.record, tx_context::sender(ctx));
         let Container{
-            uid,
+            id,
             userOwner: _,
             balance
         } = object_table::remove(&mut containerManager.record, tx_context::sender(ctx));
@@ -108,17 +115,18 @@ module grantproject::proofOfFlex{
 
         //how to fucking delete this
         balance::destroy_zero(balance);
-        object::delete(uid);
+        object::delete(id);
 
         containerManager.amount = containerManager.amount - value;
 
         //transfer the money to the owner
         transfer::transfer(redemed, tx_context::sender(ctx));
+      
         
 
     }
 
-    public entry fun mintFlexNFT(ctx: &mut TxContext, containerManager: &mut ContainerManager ){
+    public entry fun mintFlexNFT( containerManager: &mut ContainerManager , ctx: &mut TxContext ){
 
         assert!(object_table::contains(& containerManager.record, tx_context::sender(ctx)),ENonExistentContainer); //check if it's the good way to return errors
 
@@ -126,13 +134,13 @@ module grantproject::proofOfFlex{
         let container = object_table::borrow(&containerManager.record, tx_context::sender(ctx));
 
         let proof = ProofOfFlex{
-            uid: object::new(ctx),
+            id: object::new(ctx),
             url: url::new_unsafe_from_bytes(b"https://pixnio.com/free-images/2017/06/08/2017-06-08-14-28-22-1152x768.jpg"),
             name: string::utf8(b"Proof of Flex"),
             amount: balance::value(&container.balance), //check if it is the right way to access the balance
             assetID: string::utf8(b"Suicoin")
         };
-        containerManager.winner = if (proof.amount > containerManager.winner) proof.amount else containerManager.winner;
+        containerManager.winnerAmount = if (proof.amount > containerManager.winnerAmount) proof.amount else containerManager.winnerAmount;
         
 
         transfer::transfer(proof, tx_context::sender(ctx));
