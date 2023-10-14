@@ -7,6 +7,8 @@ module grantproject::proofOfFlex_tests{
     use sui::tx_context::{Self, TxContext};
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
+
+     use sui::clock::{Self, Clock};
     // simpler at the begening only sui coin
     use sui::sui::SUI;
     use sui::pay;
@@ -24,16 +26,21 @@ module grantproject::proofOfFlex_tests{
         let scenario_val = test_scenario::begin(admin);
         let scenario = &mut scenario_val;
 
+        
+
+        let clock = clock::create_for_testing(test_scenario::ctx(scenario));
+
         {
             proofOfFlex::init_for_testing(test_scenario::ctx(scenario));
         };
 
         test_scenario::next_tx(scenario, user1);
         {
+
             let coin = coin::mint_for_testing<SUI>(1000, test_scenario::ctx(scenario) );
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
 
-            proofOfFlex::depositFlexMoney( &mut containerManager, coin ,test_scenario::ctx(scenario));
+            proofOfFlex::depositFlexMoney( &mut containerManager, coin, &clock,test_scenario::ctx(scenario));
 
             assert!(proofOfFlex::getContainerAmount(&containerManager)== 1000, 1000);
             assert!(proofOfFlex::getContainerSize(&containerManager)== 1, 1);
@@ -43,9 +50,13 @@ module grantproject::proofOfFlex_tests{
 
         test_scenario::next_tx(scenario, user1);
         {
+            clock::increment_for_testing(&mut clock,266400000);
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
-            proofOfFlex::mintFlexNFT(  &mut containerManager, test_scenario::ctx(scenario));
+            proofOfFlex::mintFlexNFT(  &mut containerManager, &clock, test_scenario::ctx(scenario));
+
             assert!(proofOfFlex::getContainerWinner(&containerManager) == 1000, 1001);
+            assert!(proofOfFlex::getContainerWinnerTime(&containerManager)==266400000/86400000 , 999);
+
             test_scenario::return_shared<ContainerManager>(containerManager);
 
         };
@@ -63,7 +74,7 @@ module grantproject::proofOfFlex_tests{
 
             test_scenario::return_shared<ContainerManager>(containerManager);
         };
-
+        clock::destroy_for_testing(clock);
         test_scenario::end(scenario_val);
     }
 }

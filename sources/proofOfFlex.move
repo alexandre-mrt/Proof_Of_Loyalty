@@ -9,6 +9,7 @@ module grantproject::proofOfFlex{
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
     use sui::event;
+    use sui::clock::{Self, Clock};
     // simpler at the begening only sui coin
     use sui::sui::SUI;
 
@@ -26,7 +27,8 @@ module grantproject::proofOfFlex{
         url: Url,
         name: String,
         amount: u64,
-        assetID: String
+        assetID: String,
+        timeLockedDays: u64
     }
 
     struct AdminCap has key{
@@ -37,7 +39,8 @@ module grantproject::proofOfFlex{
     struct Container has key, store{
         id: UID,
         userOwner: address,
-        balance: Balance<SUI>
+        balance: Balance<SUI>,
+        startingTime: u64
     }
 
     //Store all the containers in the record table (dynamical storage already) could add a table to keep track of the record for the best 3
@@ -83,10 +86,14 @@ module grantproject::proofOfFlex{
     }
     public entry fun getContainerWinner(containerManager: &ContainerManager): u64{
         return containerManager.winnerAmount
+    } 
+
+    public entry fun getContainerWinnerTime(containerManager: &ContainerManager): u64{
+        return containerManager.winnerTime
     }
 
-    // create a container with the asset choosen, and put it into container Manager in a table
-    public entry fun depositFlexMoney( containerManager: &mut ContainerManager, coin: Coin<SUI>, ctx: &mut TxContext){
+    // create a container with the asset choosen, and put it into container Manager in a table. Pass in argument the clock at address (0x6)
+    public entry fun depositFlexMoney( containerManager: &mut ContainerManager, coin: Coin<SUI>, clock: &Clock, ctx: &mut TxContext){
 
         //beta does not allow user to have severals positions
         assert!(!object_table::contains(&containerManager.record, tx_context::sender(ctx)),EContainerAlreadyExist);
@@ -95,7 +102,8 @@ module grantproject::proofOfFlex{
         let container = Container{
             id: object::new(ctx),
             userOwner: tx_context::sender(ctx),
-            balance: coin::into_balance(coin)
+            balance: coin::into_balance(coin),
+            startingTime: clock::timestamp_ms(clock)
         };
         //put the container in the table
         containerManager.amount = containerManager.amount + balance::value(&container.balance);
@@ -114,7 +122,8 @@ module grantproject::proofOfFlex{
         let Container{
             id,
             userOwner: _,
-            balance
+            balance,
+            startingTime: _
         } = object_table::remove(&mut containerManager.record, tx_context::sender(ctx));
 
 
@@ -141,7 +150,7 @@ module grantproject::proofOfFlex{
 
     }
 
-    public entry fun mintFlexNFT( containerManager: &mut ContainerManager , ctx: &mut TxContext ){
+    public entry fun mintFlexNFT( containerManager: &mut ContainerManager , clock: &Clock, ctx: &mut TxContext ){
 
         assert!(object_table::contains(& containerManager.record, tx_context::sender(ctx)),ENonExistentContainer); //check if it's the good way to return errors
 
@@ -154,9 +163,11 @@ module grantproject::proofOfFlex{
             url: url::new_unsafe_from_bytes(b"https://pixnio.com/free-images/2017/06/08/2017-06-08-14-28-22-1152x768.jpg"),
             name: string::utf8(b"Proof of Flex"),
             amount: balance::value(&container.balance), //check if it is the right way to access the balancer
-            assetID: string::utf8(b"Suicoin")
+            assetID: string::utf8(b"Suicoin"),
+            timeLockedDays: (clock::timestamp_ms(clock) - container.startingTime)/86400000
         };
         containerManager.winnerAmount = if (proof.amount > containerManager.winnerAmount) proof.amount else containerManager.winnerAmount;
+        containerManager.winnerTime = if (proof.timeLockedDays > containerManager.winnerTime) proof.timeLockedDays else containerManager.winnerTime;
 
         event::emit(NFTMinted {
             object_id: object::id(&proof),
