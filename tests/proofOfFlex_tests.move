@@ -27,13 +27,13 @@ module grantproject::proofOfFlex_tests{
         {
             proofOfFlex::init_for_testing(test_scenario::ctx(scenario));
         };
+
         test_scenario::next_tx(scenario, user1);
         {
-            let ctx = test_scenario::ctx(scenario);
-            let coin = coin::mint_for_testing<SUI>(1000, ctx);
+            let coin = coin::mint_for_testing<SUI>(1000, test_scenario::ctx(scenario) );
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
 
-            proofOfFlex::depositFlexMoney(  &mut containerManager, coin,ctx);
+            proofOfFlex::depositFlexMoney( &mut containerManager, coin ,test_scenario::ctx(scenario));
 
             assert!(proofOfFlex::getContainerAmount(&containerManager)== 1000, 1000);
             assert!(proofOfFlex::getContainerSize(&containerManager)== 1, 1);
@@ -43,9 +43,8 @@ module grantproject::proofOfFlex_tests{
 
         test_scenario::next_tx(scenario, user1);
         {
-            let ctx = test_scenario::ctx(scenario);
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
-            proofOfFlex::mintFlexNFT(  &mut containerManager, ctx);
+            proofOfFlex::mintFlexNFT(  &mut containerManager, test_scenario::ctx(scenario));
             assert!(proofOfFlex::getContainerWinner(&containerManager) == 1000, 1001);
             test_scenario::return_shared<ContainerManager>(containerManager);
 
@@ -53,10 +52,10 @@ module grantproject::proofOfFlex_tests{
 
         test_scenario::next_tx(scenario, user1);
         {
-            let ctx = test_scenario::ctx(scenario);
+            
             let containerManager = test_scenario::take_shared<ContainerManager>(scenario);
 
-            proofOfFlex::redeemFlexMoney(  &mut containerManager, ctx);
+            proofOfFlex::redeemFlexMoney(  &mut containerManager, test_scenario::ctx(scenario));
 
             assert!(proofOfFlex::getContainerAmount(&containerManager)== 0, 0);
             // take the user balance to check if he received well the money

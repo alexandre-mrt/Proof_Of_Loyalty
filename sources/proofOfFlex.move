@@ -3,11 +3,12 @@ module grantproject::proofOfFlex{
 
     use sui::url::{Self, Url};
     use std::string::{Self, String};
-    use sui::object::{Self, UID};
+    use sui::object::{Self,ID, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
+    use sui::event;
     // simpler at the begening only sui coin
     use sui::sui::SUI;
 
@@ -19,7 +20,8 @@ module grantproject::proofOfFlex{
     const ENonExistentContainer: u64 = 0;
     const EContainerAlreadyExist: u64 = 1;
 
-    struct ProofOfFlex has key{
+    // Proof of Flex is a NFT that you can mint if you have a container with a certain amount of money
+    struct ProofOfFlex has key, store{
         id: UID,
         url: Url,
         name: String,
@@ -47,6 +49,19 @@ module grantproject::proofOfFlex{
         winnerTime: u64,
         winnerAmount: u64
     }
+
+        // ===== Events =====
+
+    struct NFTMinted has copy, drop {
+        // The Object ID of the NFT
+        object_id: ID,
+        // The creator of the NFT
+        creator: address,
+        // The name of the NFT
+        name: string::String,
+    }
+
+    // ===== Public view functions =====
 
     fun init(ctx: &mut TxContext){
 
@@ -120,7 +135,7 @@ module grantproject::proofOfFlex{
         containerManager.amount = containerManager.amount - value;
 
         //transfer the money to the owner
-        transfer::transfer(redemed, tx_context::sender(ctx));
+        transfer::public_transfer(redemed, tx_context::sender(ctx));
       
         
 
@@ -133,17 +148,23 @@ module grantproject::proofOfFlex{
         //try to get the container of the user in read only 
         let container = object_table::borrow(&containerManager.record, tx_context::sender(ctx));
 
+        let sender = tx_context::sender(ctx);
         let proof = ProofOfFlex{
             id: object::new(ctx),
             url: url::new_unsafe_from_bytes(b"https://pixnio.com/free-images/2017/06/08/2017-06-08-14-28-22-1152x768.jpg"),
             name: string::utf8(b"Proof of Flex"),
-            amount: balance::value(&container.balance), //check if it is the right way to access the balance
+            amount: balance::value(&container.balance), //check if it is the right way to access the balancer
             assetID: string::utf8(b"Suicoin")
         };
         containerManager.winnerAmount = if (proof.amount > containerManager.winnerAmount) proof.amount else containerManager.winnerAmount;
-        
 
-        transfer::transfer(proof, tx_context::sender(ctx));
+        event::emit(NFTMinted {
+            object_id: object::id(&proof),
+            creator: sender,
+            name: proof.name,
+        });
+        
+        transfer::public_transfer(proof,sender );
     }
 
     #[test_only]
