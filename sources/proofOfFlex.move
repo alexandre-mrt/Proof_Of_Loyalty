@@ -10,16 +10,21 @@ module grantproject::proofOfFlex{
     use sui::coin::{Self, Coin};
     use sui::event;
     use sui::clock::{Self, Clock};
+    
     // simpler at the begening only sui coin
     use sui::sui::SUI;
 
     use sui::object_table::{Self, ObjectTable};
 
 
+    const ValFee1Suicoin: u64 = 1;
 
+    // ===== Errors =====
 
     const ENonExistentContainer: u64 = 0;
     const EContainerAlreadyExist: u64 = 1;
+    const ENoFeesToTake: u64 = 2;
+    const ENoMoney: u64 = 3;
 
     // Proof of Flex is a NFT that you can mint if you have a container with a certain amount of money
     struct ProofOfFlex has key, store{
@@ -50,7 +55,9 @@ module grantproject::proofOfFlex{
         amount: u64,
         record: ObjectTable<address, Container>,
         winnerTime: u64,
-        winnerAmount: u64
+        winnerAmount: u64,
+        //why store balance and not Coin directly ? (same ?)
+        containerFees: Balance<SUI>
     }
 
         // ===== Events =====
@@ -68,13 +75,19 @@ module grantproject::proofOfFlex{
 
     fun init(ctx: &mut TxContext){
 
+        //create the containerManager
         transfer::share_object(ContainerManager{
             id: object::new(ctx),
             amount: 0,
             record: object_table::new(ctx),
             winnerAmount : 0,
-            winnerTime : 0
+            winnerTime : 0,
+            containerFees: balance::zero<SUI>()
         });
+        //create the adminCap
+        transfer::transfer(AdminCap{
+            id: object::new(ctx)
+        }, tx_context::sender(ctx));
     }
 
     public entry fun getContainerSize(containerManager: &ContainerManager): u64{
@@ -90,6 +103,10 @@ module grantproject::proofOfFlex{
 
     public entry fun getContainerWinnerTime(containerManager: &ContainerManager): u64{
         return containerManager.winnerTime
+    }
+
+    public entry fun getContainerFees(containerManager: &ContainerManager): u64{
+        return balance::value(&containerManager.containerFees)
     }
 
     // create a container with the asset choosen, and put it into container Manager in a table. Pass in argument the clock at address (0x6)
@@ -150,14 +167,24 @@ module grantproject::proofOfFlex{
 
     }
 
-    public entry fun mintFlexNFT( containerManager: &mut ContainerManager , clock: &Clock, ctx: &mut TxContext ){
+    public entry fun mintFlexNFT( containerManager: &mut ContainerManager, coin: Coin<SUI>, clock: &Clock, ctx: &mut TxContext ){
 
         assert!(object_table::contains(& containerManager.record, tx_context::sender(ctx)),ENonExistentContainer); //check if it's the good way to return errors
 
-        //try to get the container of the user in read only 
         let container = object_table::borrow(&containerManager.record, tx_context::sender(ctx));
 
         let sender = tx_context::sender(ctx);
+
+        assert!(coin::value(&coin) >= ValFee1Suicoin, ENoMoney );
+        // 1000000000 = 1 Sui
+        // is there more efficient
+        let fees = coin::split(&mut coin, ValFee1Suicoin ,ctx);
+        balance::join(&mut containerManager.containerFees, coin::into_balance(fees));
+        transfer::public_transfer(coin, sender);
+
+
+        //try to get the container of the user in read only 
+
         let proof = ProofOfFlex{
             id: object::new(ctx),
             url: url::new_unsafe_from_bytes(b"https://pixnio.com/free-images/2017/06/08/2017-06-08-14-28-22-1152x768.jpg"),
@@ -176,6 +203,15 @@ module grantproject::proofOfFlex{
         });
         
         transfer::public_transfer(proof,sender );
+    }
+
+    public entry fun takeProfit(_: &AdminCap, containerManager : &mut ContainerManager, ctx: &mut TxContext){
+        //transfer the money to the owner
+        let containerFees = balance::value(&containerManager.containerFees);
+        // diff between returning a coin and transfer ?
+        assert!(containerFees > 0, ENoFeesToTake);
+
+        transfer::public_transfer(coin::take<SUI>(&mut containerManager.containerFees, containerFees, ctx), tx_context::sender(ctx));
     }
 
     #[test_only]
